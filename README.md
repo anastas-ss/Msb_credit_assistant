@@ -9,8 +9,8 @@
 - `data/documents/` — 5 нормативных документов для RAG.
 - `data/clients/clients.sqlite` — SQLite-база клиентов для tools.
 - `data/qa/qa.jsonl` — 180 тестовых кейсов.
-- `metrics_baseline_rules.json` — baseline-метрики без реального GigaChat.
-- `metrics_final_gigachat.json` — финальные метрики с реальным GigaChat.
+- `metrics_baseline_rules.json` — baseline-метрики без GigaChat.
+- `metrics_final_gigachat.json` — финальные метрики с GigaChat.
 
 ## Установка
 
@@ -110,9 +110,4 @@ tool_success_rate    : 0.533
 rag_source_hit_rate  : 0.46
 ```
 
-Вывод: гибридная LLM-ветка реально подключена и проверена, но на текущем датасете rules baseline точнее по общему accuracy. GigaChat улучшает часть маршрутизации в сторону tools/escalation, но требует дополнительных guardrails для регламентных `info`-кейсов.
-
-## Безопасность
-
-В `.env` для GitHub должны быть только заглушки. Реальный ключ храните локально
-вне репозитория или в `.env.local` / `.env.secret`, которые исключены через `.gitignore`.
+Вывод: гибридная LLM-ветка подключена и проверена, но на текущем датасете rules baseline точнее по общему accuracy. GigaChat улучшает часть маршрутизации в сторону tools/escalation, но требует дополнительных guardrails для регламентных `info`-кейсов.
