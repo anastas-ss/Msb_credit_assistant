@@ -36,8 +36,6 @@ def main():
         print(f"   intent={out['intent']}  outcome={out['outcome_type']}  "
               f"escalation={out['escalation']}  flag={out['security_flag']}")
         print(f"🤖 {out['answer'][:160]}")
-        if out["sources"]:
-            print(f"   источники: {out['sources'][:3]}")
         print()
 
 

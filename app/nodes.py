@@ -147,6 +147,13 @@ def transactional_node(state):
     client_id = state.get("client_id")
     history = state.get("chat_history", [])
 
+    q_lower = question.lower()
+    if any(w in q_lower for w in [
+        "что ты умеешь", "на что способен", "твои возможности", "твои способности",
+        "что можешь", "как тебя использовать", "твои функции", "расскажи о себе",
+    ]):
+        return info_node(state)
+
     if not client_id:
         return {
             "draft_answer": (
@@ -160,13 +167,13 @@ def transactional_node(state):
 
     q = question.lower()
 
-    if any(w in q for w in ["статус", "заявк", "рассматр", "одобрили", "решение по", "подал", "моя заявка"]):
+    if any(w in q for w in ["статус", "заявк", "рассматр", "одобрили", "решение по", "подал", "моя заявка", "заявку"]):
         tool = client_db.get_application_status(client_id)
         kind = "application"
-    elif any(w in q for w in ["доступн", "подойд", "какие кредиты мне", "могу взять", "мне подход", "на что могу", "подобрать"]):
+    elif any(w in q for w in ["доступн", "подойд", "какие кредиты мне", "могу взять", "мне подход", "на что могу", "подобрать", "какой продукт"]):
         tool = client_db.get_client_profile(client_id)
         kind = "eligible"
-    elif any(w in q for w in ["платёж", "платеж", "погаш", "остаток", "долг", "досрочн", "закрыть кредит", "сколько должен"]):
+    elif any(w in q for w in ["платёж", "платеж", "погаш", "остаток", "долг", "досрочн", "закрыть кредит", "сколько должен", "выплатить", "оставшуюся сумму"]):
         if "правила" in q and "досрочн" in q:
             return {
                 "draft_answer": "Этот вопрос относится к общим правилам досрочного погашения. Я могу ответить по нормативным документам, но для расчёта по вашему кредиту уточните, пожалуйста, авторизацию.",

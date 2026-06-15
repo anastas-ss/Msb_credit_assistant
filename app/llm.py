@@ -57,6 +57,11 @@ _PERSONAL_WORDS = [
     "мне доступны", "мне подойдёт", "мне подойдет", "статус моей", "по моей заявке",
     "когда у меня", "сколько мне", "мой остаток", "мой скоринг", "меня одобр",
 ]
+_CAPABILITY_WORDS = [
+    "что ты умеешь", "на что способен", "твои возможности", "твои способности",
+    "что можешь", "как тебя использовать", "твои функции", "расскажи о себе",
+    "кто ты", "представься", "твоя роль",
+]
 
 
 def _classify_rules(question, history=None, client_id=None):
@@ -70,6 +75,11 @@ def _classify_rules(question, history=None, client_id=None):
         return "offtopic"
     if any(w in q for w in _NODATA_WORDS):
         return "edge_no_data"
+    if any(w in q for w in _CAPABILITY_WORDS):
+        return "info"
+    if history and client_id:
+        if not any(w in q for w in _PERSONAL_WORDS) and not any(w in q for w in ["заявк", "кредит", "платёж"]):
+            return "info"
     if any(w in q for w in _PERSONAL_WORDS) or (client_id and any(
         w in q for w in ["заявк", "кредит", "платёж", "платеж", "погаш", "доступн", "статус", "договор"]
     )):
@@ -131,6 +141,10 @@ def classify(question, history=None, client_id=None):
     if USE_REAL_LLM and has_gigachat_credentials():
         try:
             intent = _classify_gigachat(question, history, client_id)
+            if intent == "info" and client_id:
+                personal = any(w in q for w in ["мой", "моя", "моё", "мою", "мне", "меня", "у меня", "моего", "моем"])
+                if personal:
+                    return "transactional"
             if intent in ("info", "transactional", "escalation_sales", "escalation_negative"):
                 return intent
         except Exception:

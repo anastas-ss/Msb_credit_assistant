@@ -22,7 +22,7 @@ def _get_assistant():
 
         chunks = load_document_chunks(_DOCS_DIR)
         retriever = RagRetriever(chunks)
-        _assistant = RagAssistant(retriever, use_llm=None)
+        _assistant = RagAssistant(retriever, use_llm=None, top_k=10)
     return _assistant
 
 
