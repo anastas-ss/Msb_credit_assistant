@@ -1,5 +1,5 @@
 {
-  "overall_accuracy": 0.683,
+  "overall_accuracy": 0.817,
   "n_total": 180,
   "accuracy_by_category": {
     "edge_conflict": {
@@ -11,7 +11,7 @@
       "n": 18
     },
     "edge_no_data": {
-      "accuracy": 0.556,
+      "accuracy": 0.667,
       "n": 18
     },
     "escalation_negative": {
@@ -19,11 +19,11 @@
       "n": 18
     },
     "escalation_sales": {
-      "accuracy": 0.833,
+      "accuracy": 0.778,
       "n": 18
     },
     "info": {
-      "accuracy": 0.644,
+      "accuracy": 0.822,
       "n": 45
     },
     "offtopic": {
@@ -31,16 +31,16 @@
       "n": 9
     },
     "transactional": {
-      "accuracy": 0.511,
+      "accuracy": 0.844,
       "n": 45
     }
   },
   "escalation_accuracy": 0.75,
   "escalation_n": 52,
-  "rejection_accuracy": 0.385,
+  "rejection_accuracy": 0.846,
   "rejection_n": 13,
-  "tool_success_rate": 0.533,
+  "tool_success_rate": 0.489,
   "tool_n": 45,
-  "rag_source_hit_rate": 0.478,
+  "rag_source_hit_rate": 0.575,
   "rag_n": 113
 }

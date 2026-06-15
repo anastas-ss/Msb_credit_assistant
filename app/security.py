@@ -147,6 +147,36 @@ def validate_authorization(question: str, authorized_client_id=None) -> dict:
     return {"allowed": True, "reason": None, "requested_client_id": mentioned[0] if mentioned else None}
 
 
+def mentions_own_records(question: str) -> bool:
+    """True, если вопрос про КОНКРЕТНЫЕ существующие записи клиента (его заявка/кредит/платёж),
+    а не про общую допустимость или условия."""
+    q = _normalize(question)
+    if extract_client_ids(question):
+        return True
+    return any(p in q for p in _PERSONAL_DATA_WORDS)
+
+
+def is_policy_request(question: str) -> bool:
+    """True, если запрос подпадает под продуктовый стоп-фактор или решение оператора
+    (самозанятый, снижение ставки, повторный рефинанс, доп. овердрафт, снятие обеспечения,
+    тяжёлая просрочка). Нужно, чтобы такой запрос у авторизованного клиента дошёл до
+    transactional, а не был перехвачен sales-правилами."""
+    q = _normalize(question)
+    if "самозанят" in q:
+        return True
+    if ("снизить" in q or "снизьте" in q or "уменьшить" in q) and "ставк" in q:
+        return True
+    if "обратно" in q and ("дешевле" in q or "рефинансир" in q):
+        return True
+    if any(w in q for w in ["ещё овердрафт", "еще овердрафт", "уже есть овердрафт", "овердрафт оформ", "ещё и овердрафт", "еще и овердрафт"]):
+        return True
+    if "поручительств" in q and any(w in q for w in ["снять", "убрать", "снимать", "снимет"]):
+        return True
+    if "просрочк" in q and any(w in q for w in ["больш", "что делать", "огромн", "помогите", "не знаю"]):
+        return True
+    return False
+
+
 SAFE_REFUSALS = {
     "prompt_injection": (
         "Я не могу раскрывать внутренние инструкции или менять правила своей работы. "

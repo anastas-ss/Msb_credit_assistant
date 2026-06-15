@@ -17,6 +17,13 @@ _CAPABILITY_ANSWER = (
 )
 
 
+_SMALLTALK_ANSWER = (
+    "Здравствуйте! Я ассистент по кредитованию малого и микробизнеса. "
+    "Спросите про кредитные продукты, условия, подачу заявки или досрочное погашение - помогу разобраться. "
+    "Для вопросов по вашим данным потребуется авторизация."
+)
+
+
 def _is_capability_question(question):
     q = (question or "").lower()
     return any(w in q for w in _CAPABILITY_WORDS)
@@ -49,7 +56,7 @@ def classify_node(state):
 
         intent = llm.classify(question, history=history, client_id=client_id)
         if not client_id and intent == "transactional":
-            intent = "auth_required"
+            intent = "auth_required" if security.mentions_own_records(question) else "info"
 
         updates = {
             "intent": intent,
@@ -77,7 +84,9 @@ def route_after_classify(state):
         if flag == "third_party_data":
             return "rejection"
         if flag == "false_status":
-            return "escalation"
+            q = current_question(state).lower()
+            impersonates_staff = any(w in q for w in ["директор", "сотрудник банка", "руководств", "работаю в банке"])
+            return "escalation" if impersonates_staff else "rejection"
         q = current_question(state).lower()
         wants_product = any(w in q for w in ["одобри", "кредит", "оформ", "исключени", "реструктуризац"])
         if flag == "prompt_injection" and wants_product:
@@ -93,6 +102,15 @@ def info_node(state):
         if _is_capability_question(question):
             updates = {
                 "draft_answer": _CAPABILITY_ANSWER,
+                "sources": [],
+                "rag_sources": [],
+                "outcome_type": "info",
+                "escalation": False,
+            }
+            return tracing.append_span(state, sp, updates)
+        if llm.is_smalltalk(question):
+            updates = {
+                "draft_answer": _SMALLTALK_ANSWER,
                 "sources": [],
                 "rag_sources": [],
                 "outcome_type": "info",
@@ -123,6 +141,7 @@ def _is_repayment_question(q):
     return any(w in q for w in [
         "досрочн", "полное погашение", "полностью погасить", "закрыть кредит",
         "сколько нужно для погаш", "погасить полностью", "погасить весь",
+        "закро", "закрыт", "частичн досроч", "внести досроч",
     ])
 
 
@@ -193,6 +212,31 @@ def _format_transactional(kind, q, tool):
     )
 
 
+def _policy_rejection_reason(q):
+    """Стоп-факторы по продукту: запрос нельзя выполнить - выдаём отказ, а не данные."""
+    if "самозанят" in q:
+        return ("Кредитные продукты для бизнеса доступны ИП и юридическим лицам. "
+                "Самозанятым (НПД) они не предоставляются. Помогу по другим вопросам кредитования МСБ.")
+    if ("снизить" in q or "снизьте" in q or "уменьшить" in q) and "ставк" in q:
+        return ("Ставка по действующему договору не снижается в одностороннем порядке по обращению. "
+                "Изменение условий возможно только в рамках реструктуризации по отдельному заявлению.")
+    if "обратно" in q and ("дешевле" in q or "рефинансир" in q):
+        return ("Повторное рефинансирование уже рефинансированного кредита регламентом не предусмотрено.")
+    if any(w in q for w in ["ещё овердрафт", "еще овердрафт", "уже есть овердрафт", "овердрафт оформ", "ещё и овердрафт", "еще и овердрафт"]):
+        return ("Овердрафт не предоставляется при наличии действующего овердрафта или вместе с другим "
+                "кредитным продуктом - согласно регламенту кредитования.")
+    return None
+
+
+def _policy_escalation_reason(q):
+    """Случаи по продукту, которые решает оператор: эскалируем, а не отвечаем данными."""
+    if "поручительств" in q and any(w in q for w in ["снять", "убрать", "снимать", "снимет"]):
+        return "изменение обеспечения по договору"
+    if "просрочк" in q and any(w in q for w in ["больш", "что делать", "огромн", "помогите", "не знаю"]):
+        return "просрочка, требуется помощь оператора"
+    return None
+
+
 def transactional_node(state):
     question = current_question(state)
     client_id = state.get("client_id")
@@ -215,6 +259,30 @@ def transactional_node(state):
 
         q = question.lower()
         requested_client_id = auth.get("requested_client_id")
+
+        reject_reason = _policy_rejection_reason(q)
+        if reject_reason:
+            updates = {
+                "draft_answer": reject_reason,
+                "outcome_type": "rejection",
+                "escalation": False,
+                "sources": [],
+            }
+            return tracing.append_span(state, sp, updates)
+
+        esc_reason = _policy_escalation_reason(q)
+        if esc_reason:
+            updates = {
+                "draft_answer": (
+                    "Этот вопрос по вашему договору решает оператор. Передаю обращение - "
+                    "он свяжется с вами и поможет в рамках регламента."
+                ),
+                "outcome_type": "escalation",
+                "escalation": True,
+                "escalation_reason": esc_reason,
+                "sources": [],
+            }
+            return tracing.append_span(state, sp, updates)
 
         if any(w in q for w in ["статус", "заявк", "рассматр", "одобрили", "решение по", "подал", "моя заявка", "заявку"]):
             tool = client_db.get_application_status(client_id, requested_client_id=requested_client_id)

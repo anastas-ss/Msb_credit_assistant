@@ -4,6 +4,7 @@ import re
 from dotenv import load_dotenv
 load_dotenv()
 from .prompts import SYSTEM_PROMPT, ROUTER_PROMPT
+from . import security
 
 USE_REAL_LLM = True
 
@@ -16,6 +17,26 @@ VALID_INTENTS = {
 def has_gigachat_credentials():
     """True, если ключ GigaChat задан и не пустой."""
     return bool(os.getenv("GIGACHAT_CREDENTIALS"))
+
+
+_SMALLTALK_GREETINGS = (
+    "привет", "здравств", "здрасьт", "добрый день", "доброе утро", "добрый вечер",
+    "доброй ночи", "доброго дня", "приветствую", "хай", "hello", "хеллоу",
+)
+_SMALLTALK_THANKS = ("спасибо", "благодар", "спс")
+_SMALLTALK_EXACT = {"пока", "до свидания", "всего доброго", "всего хорошего", "спасибо", "ок", "окей"}
+
+
+def is_smalltalk(question):
+    """Короткая реплика-приветствие/благодарность/прощание вне предметной области."""
+    q = (question or "").lower().strip(" .,!?\n\t")
+    if not q:
+        return False
+    if q in _SMALLTALK_EXACT:
+        return True
+    if len(q) <= 30 and (q.startswith(_SMALLTALK_GREETINGS) or any(t in q for t in _SMALLTALK_THANKS)):
+        return True
+    return False
 
 
 _NEG_WORDS = [
@@ -129,12 +150,16 @@ def classify(question, history=None, client_id=None):
     """Гибридная классификация: быстрые правила для чётких кейсов, GigaChat для остальных."""
     q = (question or "").lower()
 
+    if is_smalltalk(question):
+        return "info"
     if any(w in q for w in _OFFTOPIC_WORDS):
         return "offtopic"
     if any(w in q for w in _NODATA_WORDS):
         return "edge_no_data"
     if any(w in q for w in _NEG_WORDS) or any(w in q for w in _HUMAN_WORDS):
         return "escalation_negative"
+    if client_id and security.is_policy_request(question):
+        return "transactional"
     if any(w in q for w in _SALES_WORDS):
         return "escalation_sales"
 
