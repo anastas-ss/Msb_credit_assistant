@@ -1,41 +1,28 @@
-# app/state.py — общее состояние агента, которое LangGraph передаёт между узлами.
-#
-# В LangGraph каждый узел получает state (словарь) и возвращает словарь с теми
-# полями, которые он поменял. LangGraph сам сливает их в общий state.
-# Мы описываем форму этого словаря через TypedDict, чтобы было понятно,
-# какие поля есть и что они значат. total=False означает «все поля
-# необязательны» — узлы заполняют их постепенно.
-
 from typing import TypedDict, Optional, List, Dict, Any
 
 
 class AgentState(TypedDict, total=False):
-    # ---- вход (приходит от бота / eval / qa.jsonl) ----
-    question: str                 # текущая реплика клиента
-    client_id: Optional[str]      # ID авторизованного клиента из канала; None для анонима
-    channel: str                  # chat_intern / chat_site / mobile / contact_center
-    chat_history: List[Dict[str, str]]   # история диалога [{"role": ..., "content": ...}]
+    question: str
+    client_id: Optional[str]
+    channel: str
+    chat_history: List[Dict[str, str]]
 
-    # ---- заполняет classify_node ----
-    intent: str                   # info / transactional / escalation_sales / escalation_negative /
-                                  #   edge_no_data / edge_manipulation / offtopic
-    needs_rag: bool               # нужен ли поиск по документам
-    needs_tools: bool             # нужен ли доступ к БД клиента
-    needs_escalation: bool        # нужно ли передавать оператору
-    security_flag: Optional[str]  # причина блокировки, если сработала защита (см. security.py)
+    intent: str
+    needs_rag: bool
+    needs_tools: bool
+    needs_escalation: bool
+    security_flag: Optional[str]
 
-    # ---- заполняют рабочие узлы (info / transactional / escalation / rejection) ----
-    rag_context: str              # текст найденных фрагментов документов
-    rag_sources: List[str]        # ссылки-источники вида "01_credit_products.md#2.1.2"
-    tool_result: Dict[str, Any]   # что вернули tools к БД (см. client_db.py)
-    draft_answer: str             # черновой ответ узла (до финальной сборки)
+    rag_context: str
+    rag_sources: List[str]
+    tool_result: Dict[str, Any]
+    draft_answer: str
 
-    # ---- финал (собирает answer_node) ----
-    final_answer: str             # текст ответа клиенту
-    outcome_type: str             # info / calculation / escalation / rejection / clarification
-    escalation: bool              # был ли это перевод на оператора
-    escalation_reason: str        # причина эскалации (заполняет escalation_node)
-    sources: List[str]            # источники для финального ответа
+    final_answer: str
+    outcome_type: str
+    escalation: bool
+    escalation_reason: str
+    sources: List[str]
 
 
 def make_initial_state(
@@ -58,7 +45,7 @@ def current_question(state) -> str:
 
     В single-turn это поле question. В multi-turn у части кейсов question пустой,
     а реальная реплика лежит последней в history (role=client). Тогда берём её.
-    История может использовать ключ 'text' или 'content' — учитываем оба.
+    История может использовать ключ 'text' или 'content' - учитываем оба.
     """
     q = (state.get("question") or "").strip()
     if q:

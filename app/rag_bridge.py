@@ -1,16 +1,6 @@
-# app/rag_bridge.py — тонкая обёртка над готовым RAG-пакетом msb_rag.
-#
-# Готовый RAG ТРОГАТЬ НЕЛЬЗЯ. Здесь мы только подключаемся к нему через его
-# публичный API (load_document_chunks -> RagRetriever -> RagAssistant) и отдаём
-# узлам агента ровно то, что им нужно: текст ответа и список источников.
-#
-# Чанки и ретривер тяжело строить, поэтому строим их один раз и кешируем
-# в модульных переменных (ленивая инициализация).
-
 import os
 import sys
 
-# msb_rag лежит в src/ соседнего проекта — добавим src в пути импорта.
 _APP_DIR = os.path.dirname(os.path.abspath(__file__))
 _PROJECT_ROOT = os.path.dirname(_APP_DIR)
 _SRC_DIR = os.path.join(_PROJECT_ROOT, "src")
@@ -19,7 +9,7 @@ if _SRC_DIR not in sys.path:
 
 _DOCS_DIR = os.path.join(_PROJECT_ROOT, "data", "documents")
 
-_assistant = None  # кеш RagAssistant
+_assistant = None
 
 
 def _get_assistant():
@@ -32,8 +22,6 @@ def _get_assistant():
 
         chunks = load_document_chunks(_DOCS_DIR)
         retriever = RagRetriever(chunks)
-        # use_llm=None: RagAssistant сам включит GigaChat, если задан ключ,
-        # иначе вернёт extractive-ответ. То есть работает и без сети.
         _assistant = RagAssistant(retriever, use_llm=None)
     return _assistant
 

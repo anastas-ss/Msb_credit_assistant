@@ -1,8 +1,3 @@
-# app/run.py — точка входа в агента.
-#
-# run_agent(...) — единственная функция, которую дёргают и eval, и ТГ-бот.
-# Бот подставляет client_id (из авторизации) и channel; eval — берёт их из кейса qa.jsonl.
-
 from .state import make_initial_state
 from .graph import GRAPH
 
@@ -16,15 +11,13 @@ def run_agent(question, client_id=None, channel="chat_site", chat_history=None):
         "outcome_type": result.get("outcome_type", "info"),
         "escalation": result.get("escalation", False),
         "sources": result.get("sources", []),
-        "intent": result.get("intent", ""),          # для отладки/метрик
-        "security_flag": result.get("security_flag"),  # для отладки/метрик
-        "tool_result": result.get("tool_result"),     # для метрики tool_success_rate
+        "intent": result.get("intent", ""),
+        "security_flag": result.get("security_flag"),
+        "tool_result": result.get("tool_result"),
     }
 
 
-# Небольшая демонстрация: по одному запросу на каждый путь графа.
 _DEMO = [
-    # (вопрос, client_id, channel)
     ("Какие кредиты вы предлагаете малому бизнесу?", None, "chat_site"),
     ("Какой статус по моей заявке?", "C-000002", "chat_intern"),
     ("Хочу оформить ещё один кредит на 2 миллиона.", "C-000001", "chat_intern"),

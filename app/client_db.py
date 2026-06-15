@@ -1,23 +1,7 @@
-# app/client_db.py — инструменты (tools) для доступа к БД клиентов (SQLite).
-#
-# По плану (раздел 4): НЕ даём агенту свободный SQL. Вместо этого — пять узких
-# функций, каждая со встроенной проверкой client_id. Это безопаснее: агент не
-# может случайно достать чужие данные или сломать запрос.
-#
-# Все функции возвращают единый формат, чтобы узел и метрики разбирали их одинаково:
-#   {"status": "ok",            "data": {...}}      — успех
-#   {"status": "need_auth",     "data": None}       — клиент не авторизован
-#   {"status": "access_denied", "data": None}       — попытка достать ЧУЖИЕ данные
-#   {"status": "not_found",     "data": None}       — данных нет
-#
-# Проверка доступа (раздел 4.3): если запрошенный client_id не равен
-# авторизованному — возвращаем access_denied, даже если очень просят.
-
 import os
 import sqlite3
 from datetime import datetime, timedelta
 
-# Путь к БД: data/clients/clients.sqlite относительно корня проекта.
 _APP_DIR = os.path.dirname(os.path.abspath(__file__))
 _PROJECT_ROOT = os.path.dirname(_APP_DIR)
 _DB_PATH = os.path.join(_PROJECT_ROOT, "data", "clients", "clients.sqlite")
@@ -25,7 +9,7 @@ _DB_PATH = os.path.join(_PROJECT_ROOT, "data", "clients", "clients.sqlite")
 
 def _connect():
     con = sqlite3.connect(_DB_PATH)
-    con.row_factory = sqlite3.Row  # чтобы обращаться к колонкам по имени
+    con.row_factory = sqlite3.Row
     return con
 
 
@@ -62,9 +46,6 @@ def _months_between(date_str, today):
         return None
 
 
-# ---------------------------------------------------------------------------
-# 1. Профиль клиента (для подбора продуктов и общего контекста)
-# ---------------------------------------------------------------------------
 def get_client_profile(authorized_client_id, requested_client_id=None):
     target, err = _resolve_access(authorized_client_id, requested_client_id)
     if err:
@@ -88,9 +69,6 @@ def get_client_profile(authorized_client_id, requested_client_id=None):
     return {"status": "ok", "data": data}
 
 
-# ---------------------------------------------------------------------------
-# 2. Все заявки клиента
-# ---------------------------------------------------------------------------
 def get_client_applications(authorized_client_id, requested_client_id=None):
     target, err = _resolve_access(authorized_client_id, requested_client_id)
     if err:
@@ -107,9 +85,6 @@ def get_client_applications(authorized_client_id, requested_client_id=None):
     return {"status": "ok", "data": {"client_id": target, "applications": apps, "count": len(apps)}}
 
 
-# ---------------------------------------------------------------------------
-# 3. Действующие кредиты клиента
-# ---------------------------------------------------------------------------
 def get_client_credits(authorized_client_id, requested_client_id=None):
     target, err = _resolve_access(authorized_client_id, requested_client_id)
     if err:
@@ -127,9 +102,6 @@ def get_client_credits(authorized_client_id, requested_client_id=None):
     return {"status": "ok", "data": {"client_id": target, "credits": credits, "count": len(credits)}}
 
 
-# ---------------------------------------------------------------------------
-# 4. Статус последней (самой свежей) заявки
-# ---------------------------------------------------------------------------
 def get_application_status(authorized_client_id, requested_client_id=None):
     result = get_client_applications(authorized_client_id, requested_client_id)
     if result["status"] != "ok":
@@ -137,7 +109,7 @@ def get_application_status(authorized_client_id, requested_client_id=None):
     apps = result["data"]["applications"]
     if not apps:
         return {"status": "not_found", "data": None}
-    latest = apps[0]  # уже отсортированы по дате убыванию
+    latest = apps[0]
     today = _today()
     try:
         submitted = datetime.strptime(latest["application_date"], "%Y-%m-%d").date()
@@ -147,9 +119,6 @@ def get_application_status(authorized_client_id, requested_client_id=None):
     return {"status": "ok", "data": latest}
 
 
-# ---------------------------------------------------------------------------
-# 5. Сводка по действующим кредитам + расчёт полного досрочного погашения
-# ---------------------------------------------------------------------------
 def _full_early_repayment(outstanding, rate, next_payment_date, today):
     """Оценка суммы полного досрочного погашения:
     остаток основного долга + проценты, накопленные с даты последнего платежа.
@@ -189,7 +158,6 @@ def get_active_credit_summary(authorized_client_id, requested_client_id=None):
     return {"status": "ok", "data": {"client_id": result["data"]["client_id"], "credits": credits}}
 
 
-# Коды продуктов в БД -> человеческие названия (для красивых ответов).
 PRODUCT_NAMES = {
     "BUSINESS_OBOROT": "Бизнес-Оборот",
     "BUSINESS_RAZVITIE": "Бизнес-Развитие",
@@ -200,5 +168,5 @@ PRODUCT_NAMES = {
 
 
 def product_name(code):
-    """Человеческое название продукта по коду (если код незнаком — вернём как есть)."""
+    """Человеческое название продукта по коду (если код незнаком - вернём как есть)."""
     return PRODUCT_NAMES.get(code, code)

@@ -1,16 +1,3 @@
-# app/run_eval.py — прогон тестового набора qa.jsonl через агента и подсчёт метрик.
-#
-# Что делает (план, раздел 13.1):
-#   1. читает qa.jsonl;
-#   2. для каждого кейса запускает агента (run_agent);
-#   3. сравнивает outcome_type агента с expected_outcome_type;
-#   4. считает метрики по категориям (через app/metrics.py) и печатает отчёт.
-#
-# Запуск из корня проекта:
-#   python3 -m app.run_eval
-#   python3 -m app.run_eval --limit 20        # быстрый прогон первых 20
-#   python3 -m app.run_eval --category info    # только одна категория
-
 import argparse
 import json
 import os

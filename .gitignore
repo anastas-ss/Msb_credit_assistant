@@ -1,9 +1,9 @@
-.env.local
-.env.secret
-.env.*
+*.env.local
+*.env.secret
+*.env.*
 !.env
-__pycache__/
+*__pycache__/
 *.py[cod]
-.DS_Store
+*.DS_Store
 *.zip
 archive_metrics/

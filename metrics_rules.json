@@ -1,0 +1,18 @@
+{
+  "overall_accuracy": 0.8,
+  "n_total": 20,
+  "accuracy_by_category": {
+    "info": {
+      "accuracy": 0.8,
+      "n": 20
+    }
+  },
+  "escalation_accuracy": null,
+  "escalation_n": 0,
+  "rejection_accuracy": null,
+  "rejection_n": 0,
+  "tool_success_rate": null,
+  "tool_n": 0,
+  "rag_source_hit_rate": 0.75,
+  "rag_n": 20
+}
