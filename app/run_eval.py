@@ -35,6 +35,9 @@ def run_case(case):
         "is_transactional": case.get("category") == "transactional",
         "refs": case.get("referenced_documents", []),
         "sources": out.get("sources", []),
+        "trace_id": out.get("trace_id"),
+        "trace": out.get("trace", []),
+        "trace_summary": out.get("trace_summary", {}),
     }
 
 
@@ -60,6 +63,7 @@ def main():
     parser.add_argument("--limit", type=int, default=None, help="взять только первые N кейсов")
     parser.add_argument("--category", type=str, default=None, help="фильтр по категории")
     parser.add_argument("--save", type=str, default="metrics_rules.json", help="куда сохранить метрики")
+    parser.add_argument("--save-traces", type=str, default=None, help="куда сохранить подробные traces по кейсам")
     args = parser.parse_args()
 
     cases = load_cases()
@@ -77,6 +81,13 @@ def main():
     with open(out_path, "w", encoding="utf-8") as f:
         json.dump(m, f, ensure_ascii=False, indent=2)
     print(f"\nМетрики сохранены в {args.save}")
+
+    if args.save_traces:
+        traces_path = os.path.join(_PROJECT_ROOT, args.save_traces)
+        with open(traces_path, "w", encoding="utf-8") as f:
+            for record in records:
+                f.write(json.dumps(record, ensure_ascii=False) + "\n")
+        print(f"Traces сохранены в {args.save_traces}")
 
 
 if __name__ == "__main__":

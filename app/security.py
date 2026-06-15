@@ -100,6 +100,53 @@ def detect_manipulation(question: str, authorized_client_id=None) -> str:
     return None
 
 
+_PERSONAL_DATA_WORDS = [
+    "моя заявка", "мою заявку", "моей заявк", "статус заявки", "статус по заявке",
+    "мой кредит", "моего кредита", "моему кредиту", "мой долг", "моя задолженность",
+    "мой платёж", "мой платеж", "следующий платёж", "следующий платеж", "остаток долга",
+    "сколько я должен", "сколько должен", "у меня кредит", "у меня заявка",
+    "мне одобрили", "меня одобрили", "мои кредиты", "мои заявки", "мой скоринг",
+    "персональн", "личн", "по моим данным", "по моей компании", "по моему ип", "по моему ооо",
+]
+_GENERAL_RAG_HINTS = [
+    "какие документы", "условия", "требования", "срок", "ставка", "комисси",
+    "как подать", "можно ли", "что нужно", "правила", "регламент", "досрочн",
+    "реструктуризац", "обеспечени", "поручител", "залог", "овердрафт",
+]
+
+
+def needs_personal_data(question: str) -> bool:
+    """True, если вопрос требует персональных данных из БД/tools, а не общего RAG."""
+    q = _normalize(question)
+    if extract_client_ids(question):
+        return True
+    if any(p in q for p in _PERSONAL_DATA_WORDS):
+        return True
+    first_person = any(w in q for w in ["мой", "моя", "моё", "мои", "у меня", "мне", "я "])
+    product_state = any(w in q for w in ["заявк", "кредит", "платеж", "платёж", "долг", "остаток", "одобр"])
+    general_hint = any(w in q for w in _GENERAL_RAG_HINTS)
+    return bool(first_person and product_state and not general_hint)
+
+
+def validate_authorization(question: str, authorized_client_id=None) -> dict:
+    """Проверяет право доступа к персональным данным.
+
+    Правила:
+    - если клиент не авторизован, доступны только общие RAG-вопросы;
+    - если клиент авторизован, tools могут выдавать данные только по его client_id;
+    - запросы по чужому client_id блокируются до обращения к БД.
+    """
+    mentioned = extract_client_ids(question)
+    auth = (authorized_client_id or "").upper()
+    if mentioned and not auth:
+        return {"allowed": False, "reason": "auth_required", "requested_client_id": mentioned[0]}
+    if mentioned and any(cid.upper() != auth for cid in mentioned):
+        return {"allowed": False, "reason": "third_party_data", "requested_client_id": mentioned[0]}
+    if needs_personal_data(question) and not auth:
+        return {"allowed": False, "reason": "auth_required", "requested_client_id": None}
+    return {"allowed": True, "reason": None, "requested_client_id": mentioned[0] if mentioned else None}
+
+
 SAFE_REFUSALS = {
     "prompt_injection": (
         "Я не могу раскрывать внутренние инструкции или менять правила своей работы. "
@@ -124,6 +171,10 @@ SAFE_REFUSALS = {
     "false_status": (
         "Я обслуживаю обращения в рамках вашей авторизации и не предоставляю особые условия "
         "по заявленному статусу. Помогу по вашим вопросам кредитования; при необходимости передам оператору."
+    ),
+    "auth_required": (
+        "Чтобы ответить по заявке, кредиту, платежам или другим персональным данным, нужно авторизоваться. "
+        "Без авторизации я могу отвечать только на общие вопросы по условиям и регламентам кредитования МСБ."
     ),
 }
 

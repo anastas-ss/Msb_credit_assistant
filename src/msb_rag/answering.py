@@ -18,6 +18,18 @@ SYSTEM_PROMPT = """Ты помощник Банка по вопросам кре
 """
 
 
+_POISON_PATTERNS = (
+    "игнорируй предыдущие инструкции", "игнорируй инструкции", "забудь инструкции",
+    "system prompt", "developer message", "ты теперь", "act as", "ignore previous",
+    "раскрой промпт", "покажи промпт", "обойди правила", "jailbreak",
+)
+
+
+def _is_poisoned_context(text: str) -> bool:
+    normalized = (text or "").lower()
+    return any(pattern in normalized for pattern in _POISON_PATTERNS)
+
+
 @dataclass(frozen=True)
 class RagAnswer:
     answer: str
@@ -55,6 +67,7 @@ class RagAssistant:
             top_k=self.top_k,
             min_score=self.min_score,
         )
+        results = [result for result in results if not _is_poisoned_context(result.chunk.text)]
         sources = tuple(dict.fromkeys(result.chunk.citation for result in results))
         if not results:
             return RagAnswer(

@@ -1,5 +1,7 @@
 from typing import TypedDict, Optional, List, Dict, Any
 
+from .tracing import new_trace_id
+
 
 class AgentState(TypedDict, total=False):
     question: str
@@ -12,6 +14,7 @@ class AgentState(TypedDict, total=False):
     needs_tools: bool
     needs_escalation: bool
     security_flag: Optional[str]
+    requested_client_id: Optional[str]
 
     rag_context: str
     rag_sources: List[str]
@@ -23,6 +26,10 @@ class AgentState(TypedDict, total=False):
     escalation: bool
     escalation_reason: str
     sources: List[str]
+
+    trace_id: str
+    trace: List[Dict[str, Any]]
+    trace_summary: Dict[str, Any]
 
 
 def make_initial_state(
@@ -37,6 +44,8 @@ def make_initial_state(
         "client_id": client_id,
         "channel": channel,
         "chat_history": chat_history or [],
+        "trace_id": new_trace_id(),
+        "trace": [],
     }
 
 
