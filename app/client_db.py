@@ -27,6 +27,21 @@ def _today():
     return datetime.today().date()
 
 
+def client_exists(client_id):
+    """True, если клиент с таким client_id есть в БД."""
+    if not client_id:
+        return False
+    try:
+        con = _connect()
+        row = con.execute(
+            "select 1 from clients where upper(client_id)=upper(?)", (str(client_id),)
+        ).fetchone()
+        con.close()
+        return row is not None
+    except Exception:
+        return False
+
+
 def _resolve_access(authorized_client_id, requested_client_id):
     """Проверка доступа. Возвращает (target_id, error_response_or_None)."""
     if not authorized_client_id:

@@ -2,6 +2,26 @@ from . import llm, security, rag_bridge, client_db, tracing
 from .state import current_question
 
 
+_CAPABILITY_WORDS = [
+    "что ты умеешь", "на что способен", "твои возможности", "твои способности",
+    "что можешь", "как тебя использовать", "твои функции", "расскажи о себе",
+    "кто ты", "представься", "твоя роль",
+]
+_CAPABILITY_ANSWER = (
+    "Я виртуальный ассистент Банка по кредитованию малого и микробизнеса. Помогаю по таким вопросам:\n"
+    "- условия кредитных продуктов, требования и ставки;\n"
+    "- порядок подачи и статус заявок;\n"
+    "- действующие кредиты, платежи и досрочное погашение;\n"
+    "- реструктуризация.\n"
+    "Вопросы по вашим данным доступны после авторизации. Спорные и нестандартные случаи передаю оператору."
+)
+
+
+def _is_capability_question(question):
+    q = (question or "").lower()
+    return any(w in q for w in _CAPABILITY_WORDS)
+
+
 def classify_node(state):
     question = current_question(state)
     client_id = state.get("client_id")
@@ -70,6 +90,15 @@ def info_node(state):
     question = current_question(state)
     history = state.get("chat_history", [])
     with tracing.span("rag.info", input={"question": question}) as sp:
+        if _is_capability_question(question):
+            updates = {
+                "draft_answer": _CAPABILITY_ANSWER,
+                "sources": [],
+                "rag_sources": [],
+                "outcome_type": "info",
+                "escalation": False,
+            }
+            return tracing.append_span(state, sp, updates)
         answer, sources = rag_bridge.rag_answer(question, history=history)
         updates = {
             "draft_answer": answer,
@@ -169,11 +198,7 @@ def transactional_node(state):
     client_id = state.get("client_id")
     history = state.get("chat_history", [])
 
-    q_lower = question.lower()
-    if any(w in q_lower for w in [
-        "что ты умеешь", "на что способен", "твои возможности", "твои способности",
-        "что можешь", "как тебя использовать", "твои функции", "расскажи о себе",
-    ]):
+    if _is_capability_question(question):
         return info_node(state)
 
     with tracing.span("tools.transactional", input={"question": question, "client_id": client_id, "requested_client_id": state.get("requested_client_id")}) as sp:

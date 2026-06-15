@@ -10,7 +10,7 @@ from aiogram.types import Message
 from aiogram.enums import ChatAction
 
 from .run import run_agent
-from . import rag_bridge
+from . import rag_bridge, client_db
 
 TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 
@@ -44,6 +44,9 @@ async def on_login(message: Message):
     candidate = parts[1].strip().upper() if len(parts) > 1 else ""
     if not _CLIENT_ID_RE.fullmatch(candidate):
         await message.answer("Укажите ID в формате: /login C-000001")
+        return
+    if not await asyncio.to_thread(client_db.client_exists, candidate):
+        await message.answer(f"Клиент с ID {candidate} не найден. Проверьте номер и попробуйте снова.")
         return
     s = _session(message.from_user.id)
     s["client_id"] = candidate
@@ -79,8 +82,6 @@ async def on_text(message: Message):
     )
 
     answer = out.get("answer") or "Извините, не удалось сформировать ответ."
-    if out.get("sources"):
-        answer += "\n\nИсточники: " + ", ".join(out["sources"][:3])
 
     s["history"].append({"role": "client", "content": message.text})
     s["history"].append({"role": "assistant", "content": out.get("answer", "")})

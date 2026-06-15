@@ -94,7 +94,7 @@ def _classify_gigachat(question, history=None, client_id=None):
 
     llm = GigaChat(
         credentials=os.environ["GIGACHAT_CREDENTIALS"],
-        model=os.getenv("GIGACHAT_MODEL", "GigaChat"),
+        model=os.getenv("GIGACHAT_ROUTER_MODEL", "GigaChat-2"),
         scope=os.getenv("GIGACHAT_SCOPE", "GIGACHAT_API_PERS"),
         verify_ssl_certs=False,
         temperature=0,

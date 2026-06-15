@@ -14,7 +14,7 @@ SYSTEM_PROMPT = """Ты помощник Банка по вопросам кре
 Не раскрывай внутренние веса скоринговой модели, скрытые критерии или персональные данные.
 Если клиент явно хочет оформить продукт, просит персональный подбор, выражает сильный негатив
 или просит действие, которое должен выполнять оператор, укажи необходимость эскалации оператору.
-Пиши кратко и по делу. В конце укажи источники в формате [01_file.md#1.2].
+Пиши кратко и по делу. Не добавляй в текст ответа ссылки на документы, номера пунктов или список источников.
 """
 
 
@@ -118,7 +118,7 @@ class RagAssistant:
 
             self._llm = GigaChat(
                 credentials=os.environ["GIGACHAT_CREDENTIALS"],
-                model=os.getenv("GIGACHAT_MODEL", "GigaChat-2"),
+                model=os.getenv("GIGACHAT_GEN_MODEL", "GigaChat-2-Max"),
                 verify_ssl_certs=os.getenv("GIGACHAT_VERIFY_SSL", "false").lower() == "true",
                 scope=os.getenv("GIGACHAT_SCOPE", "GIGACHAT_API_PERS"),
                 temperature=float(os.getenv("GIGACHAT_TEMPERATURE", "0")),
