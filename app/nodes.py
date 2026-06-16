@@ -161,7 +161,7 @@ def _format_transactional(kind, q, tool):
     if status == "not_found":
         if kind == "application":
             return ("По данным БД у вас нет поданных заявок.", "info")
-        if kind == "credit":
+        if kind in ("credit", "credit_presence", "credit_balance", "next_payment"):
             return ("По данным БД у вас нет действующих кредитов.", "info")
         return ("По данным БД информация не найдена.", "info")
 
@@ -186,6 +186,35 @@ def _format_transactional(kind, q, tool):
             f"Точный персональный подбор подтвердит менеджер.",
             "info",
         )
+
+    if kind == "credit_presence":
+        credits = data.get("credits", [])
+        if not data.get("has_active_credits") or not credits:
+            return ("По данным БД у вас нет действующих кредитов.", "info")
+        names = [c.get("product_name") or client_db.product_name(c.get("product_code")) for c in credits[:3]]
+        more = f" и ещё {len(credits) - 3}" if len(credits) > 3 else ""
+        listed = ", ".join(f"«{n}»" for n in names)
+        if len(credits) == 1:
+            return (f"Да, по данным БД у вас есть действующий кредит: {listed}.", "info")
+        return (f"Да, по данным БД у вас {len(credits)} действующих кредита: {listed}{more}.", "info")
+
+    if kind == "credit_balance":
+        credits = data.get("credits", [])
+        if not credits:
+            return ("По данным БД у вас нет действующих кредитов.", "info")
+        if len(credits) == 1:
+            c = credits[0]
+            name = c.get("product_name") or client_db.product_name(c.get("product_code"))
+            return (f"Остаток основного долга по действующему кредиту «{name}» - "
+                    f"{_money(c.get('principal_outstanding'))} ₽.", "info")
+        return (f"Общий остаток основного долга по действующим кредитам - "
+                f"{_money(data.get('total_principal_outstanding'))} ₽.", "info")
+
+    if kind == "next_payment":
+        c = data.get("credit") or {}
+        name = c.get("product_name") or client_db.product_name(c.get("product_code"))
+        return (f"Следующий платёж по кредиту «{name}» запланирован на "
+                f"{data.get('next_payment_date')}, сумма - {_money(data.get('next_payment_amount'))} ₽.", "info")
 
     credits = data.get("credits", [])
     if not credits:
@@ -290,6 +319,15 @@ def transactional_node(state):
         elif any(w in q for w in ["доступн", "подойд", "какие кредиты мне", "могу взять", "мне подход", "на что могу", "подобрать", "какой продукт"]):
             tool = client_db.get_client_profile(client_id, requested_client_id=requested_client_id)
             kind = "eligible"
+        elif any(w in q for w in ["есть кредиты", "у меня кредиты", "у меня уже есть кредит", "мои кредиты", "какие кредиты у меня", "есть ли кредит", "есть ли у меня кредит"]):
+            tool = client_db.get_credit_presence(client_id, requested_client_id=requested_client_id)
+            kind = "credit_presence"
+        elif any(w in q for w in ["баланс", "остаток", "остаток долга", "сколько должен", "сколько осталось", "оставшуюся сумму", "основной долг", "задолженность"]):
+            tool = client_db.get_active_credit_balance(client_id, requested_client_id=requested_client_id)
+            kind = "credit_balance"
+        elif any(w in q for w in ["следующий платеж", "следующий платёж", "когда платить", "когда платёж", "когда платеж", "дата платежа", "ближайший плат", "очередной плат", "платёж когда", "платеж когда"]):
+            tool = client_db.get_next_payment(client_id, requested_client_id=requested_client_id)
+            kind = "next_payment"
         elif any(w in q for w in ["платёж", "платеж", "погаш", "остаток", "долг", "досрочн", "закрыть кредит", "сколько должен", "выплатить", "оставшуюся сумму"]):
             if "правила" in q and "досрочн" in q:
                 updates = {

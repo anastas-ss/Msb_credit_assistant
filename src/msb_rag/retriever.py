@@ -122,6 +122,16 @@ def _expand_query(query: str) -> str:
         expansions.append("пакет документов для реструктуризации подтверждающие документы")
     if "кредитн" in normalized and "истори" in normalized:
         expansions.append("последствия реструктуризации кредитная история бюро кредитных историй")
+    if any(t in normalized for t in ("документ", "справк", "выписк", "анкета", "пакет")):
+        expansions.append("порядок подачи заявки пакет документов ИП ООО заявление анкета выписка")
+    if any(t in normalized for t in ("досроч", "погас", "чдп", "пдп", "закрыть кредит")):
+        expansions.append("досрочное погашение частичное полное заявление перерасчет процентов")
+    if any(t in normalized for t in ("реструктур", "отсроч", "каникул", "изменить график")):
+        expansions.append("реструктуризация отсрочка изменение графика основания документы")
+    if any(t in normalized for t in ("жалоб", "оператор", "менеджер", "специалист", "недовол")):
+        expansions.append("эскалация оператор жалоба негативное обращение менеджер")
+    if any(t in normalized for t in ("продукт", "ставк", "сумм", "срок", "лимит", "оборотн", "инвестицион")):
+        expansions.append("кредитные продукты условия ставка сумма срок лимит обеспечение")
     return f"{query}\n{' '.join(expansions)}" if expansions else query
 
 
@@ -162,6 +172,16 @@ def _boost_scores(query: str, chunks: list[DocumentChunk], scores: np.ndarray) -
 
 def _routing_boost(query: str, chunk: DocumentChunk) -> float:
     boost = 0.0
+    document_boosts = [
+        (("документ", "справк", "выписк", "анкета", "подать заяв", "подача заяв", "статус заяв", "рассмотр"), "02_application_process.md", 0.14),
+        (("досроч", "погас", "чдп", "пдп", "закрыть кредит"), "03_early_repayment.md", 0.18),
+        (("реструктур", "отсроч", "каникул", "изменить график"), "04_restructuring.md", 0.18),
+        (("оператор", "жалоб", "негатив", "претензи", "менеджер", "специалист"), "05_customer_communication.md", 0.14),
+        (("продукт", "ставк", "лимит", "срок", "сумм", "оборотн", "инвестицион", "овердрафт", "рефинанс"), "01_credit_products.md", 0.12),
+    ]
+    for terms, source, amount in document_boosts:
+        if any(term in query for term in terms):
+            boost += _source_boost(chunk, source, amount)
     product_discovery = (
         "какие" in query
         and any(token in query for token in ("кредит", "продукт", "предлага"))

@@ -173,6 +173,109 @@ def get_active_credit_summary(authorized_client_id, requested_client_id=None):
     return {"status": "ok", "data": {"client_id": result["data"]["client_id"], "credits": credits}}
 
 
+def _add_months(d, months):
+    """Добавляет months месяцев к date без внешних зависимостей."""
+    month = d.month - 1 + months
+    year = d.year + month // 12
+    month = month % 12 + 1
+    month_lengths = [31, 29 if year % 4 == 0 and (year % 100 != 0 or year % 400 == 0) else 28,
+                     31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+    day = min(d.day, month_lengths[month - 1])
+    return d.replace(year=year, month=month, day=day)
+
+
+def _adjust_next_payment(credit, today=None):
+    """Ближайший БУДУЩИЙ платёж. Если сохранённая в БД дата уже прошла (бот запущен
+    позже даты генерации данных), сдвигаем её на месячные периоды вперёд в рамках
+    срока кредита - чтобы не называть прошедшую дату следующим платежом."""
+    today = today or datetime.today().date()
+    raw = credit.get("next_payment_date")
+    if not raw:
+        return None
+    try:
+        pay_date = datetime.strptime(raw, "%Y-%m-%d").date()
+    except Exception:
+        return None
+    months_shifted = 0
+    term_months = credit.get("term_months")
+    months_passed = credit.get("months_passed") or 0
+    max_extra_months = None
+    if term_months is not None:
+        max_extra_months = max(0, int(term_months) - int(months_passed))
+    while pay_date < today:
+        if max_extra_months is not None and months_shifted >= max_extra_months:
+            return None
+        months_shifted += 1
+        pay_date = _add_months(pay_date, 1)
+    return {"next_payment_date": pay_date.isoformat(), "months_shifted": months_shifted}
+
+
+def _active_credits_from_result(result):
+    """Активными считаем кредиты с остатком основного долга > 0 (явного status в БД нет)."""
+    if result.get("status") != "ok":
+        return []
+    credits = result.get("data", {}).get("credits", []) or []
+    return [c for c in credits if (c.get("principal_outstanding") or 0) > 0]
+
+
+def get_credit_presence(authorized_client_id, requested_client_id=None):
+    """Узкий tool для вопроса «есть ли у меня кредиты?»."""
+    result = get_client_credits(authorized_client_id, requested_client_id)
+    if result["status"] != "ok":
+        return result
+    active = _active_credits_from_result(result)
+    return {"status": "ok", "data": {
+        "client_id": result["data"]["client_id"],
+        "has_active_credits": bool(active),
+        "active_count": len(active),
+        "credits": active,
+    }}
+
+
+def get_active_credit_balance(authorized_client_id, requested_client_id=None):
+    """Узкий tool для вопросов про остаток/баланс долга."""
+    result = get_client_credits(authorized_client_id, requested_client_id)
+    if result["status"] != "ok":
+        return result
+    active = _active_credits_from_result(result)
+    if not active:
+        return {"status": "not_found", "data": None}
+    total_outstanding = sum((c.get("principal_outstanding") or 0) for c in active)
+    return {"status": "ok", "data": {
+        "client_id": result["data"]["client_id"],
+        "credits": active,
+        "count": len(active),
+        "total_principal_outstanding": total_outstanding,
+    }}
+
+
+def get_next_payment(authorized_client_id, requested_client_id=None):
+    """Узкий tool для вопроса «когда следующий платёж?». При нескольких кредитах берём
+    ближайшую дату; прошедшую дату из БД сдвигаем в будущее (_adjust_next_payment)."""
+    result = get_client_credits(authorized_client_id, requested_client_id)
+    if result["status"] != "ok":
+        return result
+    active = _active_credits_from_result(result)
+    if not active:
+        return {"status": "not_found", "data": None}
+
+    def key(c):
+        try:
+            return datetime.strptime(c.get("next_payment_date"), "%Y-%m-%d").date()
+        except Exception:
+            return datetime.max.date()
+
+    credit = sorted(active, key=key)[0]
+    adjusted = _adjust_next_payment(credit)
+    npd = adjusted["next_payment_date"] if adjusted else credit.get("next_payment_date")
+    return {"status": "ok", "data": {
+        "client_id": result["data"]["client_id"],
+        "credit": credit,
+        "next_payment_date": npd,
+        "next_payment_amount": credit.get("next_payment_amount"),
+    }}
+
+
 PRODUCT_NAMES = {
     "BUSINESS_OBOROT": "Бизнес-Оборот",
     "BUSINESS_RAZVITIE": "Бизнес-Развитие",
